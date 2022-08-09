@@ -116,6 +116,8 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
     description = 'Codebuild role created for Numerai Compute'
     codebuild_role = create_or_get_role(role_name, assume_role_policy_doc, description)
 
+    time.sleep(10)
+
     cb_project_name = f"build-{repo_name}"
 
     policy_name = 'codebuild-numerai-container-policy'
@@ -125,43 +127,11 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
         {{
             "Effect": "Allow",
             "Action": [
-                "codebuild:UpdateProjectVisibility",
-                "codebuild:StopBuild",
-                "ecr:DescribeImageReplicationStatus",
-                "ecr:ListTagsForResource",
-                "ecr:ListImages",
-                "ecr:BatchGetRepositoryScanningConfiguration",
-                "codebuild:RetryBuild",
-                "codebuild:UpdateProject",
-                "codebuild:StopBuildBatch",
-                "codebuild:CreateReport",
-                "logs:CreateLogStream",
-                "codebuild:UpdateReport",
-                "codebuild:BatchPutCodeCoverages",
-                "ecr:TagResource",
-                "ecr:DescribeRepositories",
-                "ecr:BatchCheckLayerAvailability",
-                "ecr:GetLifecyclePolicy",
-                "codebuild:DeleteBuildBatch",
-                "codebuild:RetryBuildBatch",
-                "ecr:DescribeImageScanFindings",
-                "ecr:GetLifecyclePolicyPreview",
-                "ecr:GetDownloadUrlForLayer",
-                "logs:CreateLogGroup",
-                "logs:PutLogEvents",
-                "codebuild:CreateProject",
+                "codebuild:*",
+                "ecr:*",
                 "s3:GetObject",
-                "codebuild:CreateReportGroup",
-                "ecr:UntagResource",
-                "codebuild:StartBuildBatch",
-                "ecr:BatchGetImage",
-                "ecr:DescribeImages",
-                "codebuild:StartBuild",
-                "codebuild:BatchPutTestCases",
                 "s3:GetObjectVersion",
-                "ecr:GetRepositoryPolicy",
-                "ecr:GetAuthorizationToken",
-                "ecr:CreateRepository"
+                "logs:*"
             ],
             "Resource": [
                 "arn:aws:s3:::numerai-compute-{aws_account_id}/codebuild-container-{model_id}.zip",
@@ -169,8 +139,7 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
                 "arn:aws:ecr:us-west-2:{aws_account_id}:repository/*",
                 "arn:aws:codebuild:us-west-2:{aws_account_id}:build/build-numerai-compute-lambda-image",
                 "arn:aws:codebuild:us-west-2:{aws_account_id}:build/build-numerai-compute-lambda-image:*",
-                "arn:aws:logs:us-west-2:{aws_account_id}:log-group:/aws/codebuild/{cb_project_name}",
-                "arn:aws:logs:us-west-2:{aws_account_id}:log-group:/aws/codebuild/{cb_project_name}:*"
+                "arn:aws:logs:us-west-2:{aws_account_id}:log-group:*"
             ]
         }},
         {{
@@ -228,7 +197,7 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
         {{
             "Effect": "Allow",
             "Action": [
-                "sts:*"
+                "logs:*"
             ],
             "Resource": "*"
         }}
@@ -246,7 +215,7 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
 
     args = {
         "name": cb_project_name,
-        "description": f"Build the container {repo_name} for running notebooks in SageMaker",
+        "description": f"Build the container {repo_name} for Numerai Compute",
         "source": {"type": "S3", "location": codebuild_zipfile},
         "artifacts": {"type": "NO_ARTIFACTS"},
         "environment": {
