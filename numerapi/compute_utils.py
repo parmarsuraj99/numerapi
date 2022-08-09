@@ -9,6 +9,7 @@ import pathlib
 import sys
 import time
 import zipfile
+from pathlib import Path
 
 
 def maybe_create_bucket(aws_account_id):
@@ -34,49 +35,61 @@ def maybe_create_zip_file(model_id, bucket_name):
     # ideally we would only do this step if the requirements.txt changes. but until then
     # this will just run every time
     orig_dir = os.getcwd()
+
+    # python 3.10 introduced a ignore_cleanup_errors argument, but we
+    # dont want to force users to use 3.10, so the workaround is to
+    # manually create the tmp dir and attempt a cleanup at the end.
+    # found the answer on this post:
+    # https://www.scivision.dev/python-tempfile-permission-error-windows/
+    temp_dir = tempfile.TemporaryDirectory()
+    temp_path = Path(temp_dir.name)
     try:
-        with tempfile.TemporaryDirectory() as td:
+        key = f"codebuild-container-{model_id}.zip"
+        os.chdir(temp_path)
 
-            key = f"codebuild-container-{model_id}.zip"
-            os.chdir(td)
+        # TODO: need way to support user modified Dockerfile?
 
-            # TODO: need way to support user modified Dockerfile?
+        # download dockerfile and buildspec from git
+        dockerfile_url = 'https://raw.githubusercontent.com/numerai/compute-lite/master/Dockerfile'
+        buildspec_url = 'https://raw.githubusercontent.com/numerai/compute-lite/master/buildspec.yml'
+        entrysh_url = 'https://raw.githubusercontent.com/numerai/compute-lite/master/entry.sh'
 
-            # download dockerfile and buildspec from git
-            dockerfile_url = 'https://raw.githubusercontent.com/numerai/compute-lite/master/Dockerfile'
-            buildspec_url = 'https://raw.githubusercontent.com/numerai/compute-lite/master/buildspec.yml'
-            entrysh_url = 'https://raw.githubusercontent.com/numerai/compute-lite/master/entry.sh'
+        urllib.request.urlretrieve(dockerfile_url, 'Dockerfile')
+        urllib.request.urlretrieve(buildspec_url, 'buildspec.yml')
+        urllib.request.urlretrieve(entrysh_url, 'entry.sh')
 
-            urllib.request.urlretrieve(dockerfile_url, 'Dockerfile')
-            urllib.request.urlretrieve(buildspec_url, 'buildspec.yml')
-            urllib.request.urlretrieve(entrysh_url, 'entry.sh')
+        with tempfile.TemporaryFile() as tmp:
+            with zipfile.ZipFile(tmp, "w") as zip:
+                for dirname, _, filelist in os.walk("."):
+                    for file in filelist:
+                        if file == 'Dockerfile' or file == 'buildspec.yml' or file == 'entry.sh':
+                            zip.write(f"{dirname}/{file}")
 
-            with tempfile.TemporaryFile() as tmp:
-                with zipfile.ZipFile(tmp, "w") as zip:
-                    for dirname, _, filelist in os.walk("."):
-                        for file in filelist:
-                            if file == 'Dockerfile' or file == 'buildspec.yml' or file == 'entry.sh':
-                                zip.write(f"{dirname}/{file}")
+                # TODO: need to error loudly if any of these files arent found!
 
-                    # TODO: need to error loudly if any of these files arent found!
+                for dirname, _, filelist in os.walk(orig_dir):
+                    for file in filelist:
+                        if file == 'requirements.txt':
+                            print('found requirements.txt')
+                            zip.write(f"{dirname}/{file}", file)
 
-                    for dirname, _, filelist in os.walk(orig_dir):
-                        for file in filelist:
-                            if file == 'requirements.txt':
-                                print('found requirements.txt')
-                                zip.write(f"{dirname}/{file}", file)
-
-                    for dirname, _, filelist in os.walk(pathlib.Path(__file__).parent.resolve()):
-                        for file in filelist:
-                            if file == 'lambda_handler.py':
-                                print('found lambda_handler')
-                                zip.write(f"{dirname}/{file}", file)
-                tmp.seek(0)
-                s3 = boto3.session.Session().client("s3")
-                s3.upload_fileobj(tmp, bucket_name, key)
-                print(f'Uploaded codebuild zip file: s3://{bucket_name}/{key}')
+                for dirname, _, filelist in os.walk(pathlib.Path(__file__).parent.resolve()):
+                    for file in filelist:
+                        if file == 'lambda_handler.py':
+                            print('found lambda_handler')
+                            zip.write(f"{dirname}/{file}", file)
+            tmp.seek(0)
+            s3 = boto3.session.Session().client("s3")
+            s3.upload_fileobj(tmp, bucket_name, key)
+            print(f'Uploaded codebuild zip file: s3://{bucket_name}/{key}')
     finally:
         os.chdir(orig_dir)
+
+    try:
+        temp_dir.cleanup()
+    except PermissionError:
+        pass
+
     return key
 
 
@@ -115,8 +128,6 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
     '''
     description = 'Codebuild role created for Numerai Compute'
     codebuild_role = create_or_get_role(role_name, assume_role_policy_doc, description)
-
-    time.sleep(10)
 
     cb_project_name = f"build-{repo_name}"
 
