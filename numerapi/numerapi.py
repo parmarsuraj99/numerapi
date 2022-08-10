@@ -1107,10 +1107,9 @@ class NumerAPI(base_api.Api):
         compute_utils.upload_to_s3(bucket_name, model_id, 'features.json')
 
         # generate requirements.txt file..
-
         # TODO: better way to add numerapi to requirements..
         with open('requirements.txt', 'w') as file:
-            subprocess.Popen(['pip', 'freeze'], stdout=file).communicate()
+            subprocess.Popen(['pip', 'list', '--format=freeze'], stdout=file).communicate()
             file.write("numerapi")
 
         # TODO: only run these steps if requirements.txt file changes
