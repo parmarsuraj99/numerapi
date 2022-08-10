@@ -1109,7 +1109,7 @@ class NumerAPI(base_api.Api):
         # generate requirements.txt file..
         # TODO: better way to add numerapi to requirements..
         with open('requirements.txt', 'w') as file:
-            subprocess.Popen(['pip', 'list', '--format=freeze'], stdout=file).communicate()
+            subprocess.Popen(['pip', 'list', '--format=freeze', '|', 'grep', '-v', 'numerapi'], stdout=file).communicate()
             file.write("numerapi")
 
         # TODO: only run these steps if requirements.txt file changes
