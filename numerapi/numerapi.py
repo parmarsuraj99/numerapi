@@ -1111,6 +1111,7 @@ class NumerAPI(base_api.Api):
         with open('requirements.txt', 'w') as file:
             subprocess.Popen(['pip', 'list', '--format=freeze', '|', 'grep', '-v', 'numerapi'], stdout=file).communicate()
             file.write("numerapi")
+            file.write("boto3")
 
         # TODO: only run these steps if requirements.txt file changes
         zip_file_key = compute_utils.maybe_create_zip_file(model_id, bucket_name)
