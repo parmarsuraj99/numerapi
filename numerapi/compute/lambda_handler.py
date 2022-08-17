@@ -3,8 +3,11 @@ from numerapi import NumerAPI
 import boto3
 import json
 import logging
+import sys
+import traceback
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 secretsmanager = boto3.client('secretsmanager')
 api_keys_secret = secretsmanager.get_secret_value(SecretId='numerai-api-keys')
@@ -31,21 +34,25 @@ def run(event, context):
         current_round = napi.get_current_round()
         napi.download_dataset("v4/live.parquet", f"/tmp/v4/live_{current_round}.parquet")
         live_data = pd.read_parquet(f'/tmp/v4/live_{current_round}.parquet')
+        logger.info(f'Downloaded /tmp/v4/live_{current_round}.parquet')
 
         s3 = boto3.client('s3')
         aws_account_id = boto3.client('sts').get_caller_identity().get('Account')
         s3.download_file(f'numerai-compute-{aws_account_id}', f'{model_id}/model.pkl', '/tmp/model.pkl')
         model = pd.read_pickle(f"/tmp/model.pkl")
+        logger.info(f'Unpickled {model_id}/model.pkl')
 
         model_name = 'model'
         s3.download_file(f'numerai-compute-{aws_account_id}', f'{model_id}/features.json', '/tmp/features.json')
         f = open('/tmp/features.json')
         features = json.load(f)
+        logger.info(f'Loaded features {model_id}/features.json')
 
         live_data.loc[:, f"preds_{model_name}"] = model.predict(
             live_data.loc[:, features])
 
         live_data["prediction"] = live_data[f"preds_{model_name}"].rank(pct=True)
+        logger.info(f'Live predictions and ranked')
 
         predict_output_path = f"/tmp/live_predictions_{current_round}.csv"
         live_data["prediction"].to_csv(predict_output_path)
@@ -56,6 +63,14 @@ def run(event, context):
 
     except Exception as ex:
         set_lambda_status(context.function_name, model_id, request_id, "error", napi, log_stream_name)
+        exception_type, exception_value, exception_traceback = sys.exc_info()
+        traceback_string = traceback.format_exception(exception_type, exception_value, exception_traceback)
+        err_msg = json.dumps({
+            "errorType": exception_type.__name__,
+            "errorMessage": str(exception_value),
+            "stackTrace": traceback_string
+        })
+        logger.error(err_msg)
         return False
 
     set_lambda_status(context.function_name, model_id, request_id, "complete", napi, log_stream_name)
