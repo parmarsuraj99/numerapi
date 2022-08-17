@@ -1122,6 +1122,7 @@ class NumerAPI(base_api.Api):
             file.writelines(lines)
             file.write("numerapi\n")
             file.write("boto3\n")
+            file.write("pyarrow\n")
 
         # TODO: only run these steps if requirements.txt file changes
         zip_file_key = compute_utils.maybe_create_zip_file(model_id, bucket_name)
