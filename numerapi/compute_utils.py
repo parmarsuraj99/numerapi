@@ -245,13 +245,24 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
         "serviceRole": codebuild_role['Arn'],
     }
 
-    try:
-        response = client.create_project(**args)
-    except Exception as ex:
-        print('Unable to create project, trying delete and recreate..')
-        client.delete_project(name=cb_project_name)
-        response = client.create_project(**args)
-        print('Project recreated')
+    retries = 1
+    max_retries = 3
+    while retries <= max_retries:
+        try:
+            client.create_project(**args)
+        except client.exceptions.InvalidInputException as iie:
+            # this error happens when the IAM role isn't quite ready yet, so retry after 5 seconds
+            print('Codebuild IAM role not created yet, retrying in 5 seconds..')
+            retries = retries + 1
+            time.sleep(5)
+        except client.exceptions.ResourceAlreadyExistsException as ex:
+            retries = max_retries
+            print('Codebuild project exists, recreating..')
+            client.delete_project(name=cb_project_name)
+            client.create_project(**args)
+            print('Codebuild project recreated')
+        except Exception as ex:
+            raise ex
 
     return cb_project_name
 
@@ -589,23 +600,32 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
     repo_uri = ecr['repositoryUri']
     image_uri = f'{repo_uri}:latest'
 
-    try:
-        resp = client.create_function(
-            FunctionName=function_name,
-            PackageType='Image',
-            Code={
-                'ImageUri': image_uri
-            },
-            Role=lambda_role['Arn'],
-            MemorySize=512,
-            Timeout=300
-        )
-    except Exception as ex:
-        print('Unable to create function, trying update to latest ECR image..')
-        resp = client.update_function_code(
-            FunctionName=function_name,
-            ImageUri=image_uri
-        )
-        print('Function updated')
+    retries = 1
+    max_retries = 3
+    while retries <= max_retries:
+        try:
+            client.create_function(
+                FunctionName=function_name,
+                PackageType='Image',
+                Code={
+                    'ImageUri': image_uri
+                },
+                Role=lambda_role['Arn'],
+                MemorySize=512,
+                Timeout=300
+            )
+        except client.exceptions.InvalidParameterValueException as ex:
+            print('Lambda IAM role not created yet, retrying in 5 seconds..')
+            retries = retries + 1
+            time.sleep(5)
+        except client.exceptions.ResourceConflictException as ex:
+            print('Lambda already exists, updating to latest ECR image..')
+            client.update_function_code(
+                FunctionName=function_name,
+                ImageUri=image_uri
+            )
+            print('Function updated')
+        except Exception as ex:
+            raise ex
 
     return lambda_role['Arn'], function_name
