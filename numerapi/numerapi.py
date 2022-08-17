@@ -16,6 +16,7 @@ import pandas as pd
 
 from numerapi import utils, compute_utils
 from numerapi import base_api
+import pkg_resources
 
 
 class NumerAPI(base_api.Api):
@@ -1085,6 +1086,8 @@ class NumerAPI(base_api.Api):
 
     def deploy(self, model_id, model, features):
 
+        numerapi_version = pkg_resources.get_distribution('numerapi').version
+
         # login to store numerai api keys from environment variables
         self._login()
 
@@ -1109,9 +1112,16 @@ class NumerAPI(base_api.Api):
         # generate requirements.txt file..
         # TODO: better way to add numerapi to requirements..
         with open('requirements.txt', 'w') as file:
-            subprocess.Popen(['pip', 'list', '--format=freeze', '|', 'grep', '-v', 'numerapi'], stdout=file).communicate()
-            file.write("numerapi")
-            file.write("boto3")
+            subprocess.Popen(['pipreqs', '--print'], stdout=file).communicate()
+
+        with open('requirements.txt', 'r') as file:
+            lines = file.readlines()
+
+        lines = [l for l in lines if "numerapi" not in l]
+        with open('requirements.txt', 'w') as file:
+            file.writelines(lines)
+            file.write("numerapi\n")
+            file.write("boto3\n")
 
         # TODO: only run these steps if requirements.txt file changes
         zip_file_key = compute_utils.maybe_create_zip_file(model_id, bucket_name)
@@ -1144,16 +1154,17 @@ class NumerAPI(base_api.Api):
         resp = self.raw_query(query, authorization=True)
         model_name = resp['data']['model']['name']
         lambda_role_arn, lambda_function_name = compute_utils.maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, model_id, external_id)
-        self.set_lambda_data(model_id, lambda_role_arn, lambda_function_name)
+        self.set_lambda_data(model_id, lambda_role_arn, lambda_function_name, numerapi_version)
 
         print(f'Deploy complete! Go to https://numer.ai/compute to view your deployed model')
 
-    def set_lambda_data(self, model_id, lambda_role_arn, lambda_function_name):
+    def set_lambda_data(self, model_id, lambda_role_arn, lambda_function_name, numerapi_version):
         query = f'''mutation setModelLambdaArn {{
             modelLambdaArn(
                 modelId:"{model_id}", 
                 roleArn:"{lambda_role_arn}",
-                functionName:"{lambda_function_name}") {{
+                functionName:"{lambda_function_name}",
+                numerapiVersion:"{numerapi_version}") {{
             lambdaRoleArn
             userId
             lambdaFunctionName

@@ -6,7 +6,7 @@ def load(path):
     return open(path, 'r').read()
 
 
-numerapi_version = '2.12.9'
+numerapi_version = '2.12.10'
 
 
 classifiers = [
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         packages=find_packages(exclude=['tests']),
         install_requires=["requests", "pytz", "python-dateutil",
                           "tqdm>=4.29.1", "click>=7.0", "pandas>=1.1.0",
-                          "boto3==1.23.10"],
+                          "boto3==1.23.10", "pipreqs==0.4.11"],
         entry_points={
           'console_scripts': [
               'numerapi = numerapi.cli:cli'
