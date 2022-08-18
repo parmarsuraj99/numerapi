@@ -245,9 +245,9 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
         "serviceRole": codebuild_role['Arn'],
     }
 
-    retries = 1
+    retries = 0
     max_retries = 3
-    while retries <= max_retries:
+    while retries < max_retries:
         try:
             client.create_project(**args)
         except client.exceptions.InvalidInputException as iie:
@@ -600,9 +600,9 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
     repo_uri = ecr['repositoryUri']
     image_uri = f'{repo_uri}:latest'
 
-    retries = 1
+    retries = 0
     max_retries = 3
-    while retries <= max_retries:
+    while retries < max_retries:
         try:
             client.create_function(
                 FunctionName=function_name,
@@ -619,6 +619,7 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
             retries = retries + 1
             time.sleep(5)
         except client.exceptions.ResourceConflictException as ex:
+            retries = max_retries
             print('Lambda already exists, updating to latest ECR image..')
             client.update_function_code(
                 FunctionName=function_name,
