@@ -10,6 +10,7 @@ import sys
 import time
 import zipfile
 from pathlib import Path
+from platform import python_version
 
 
 def maybe_create_bucket(aws_account_id):
@@ -226,7 +227,13 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
     client = session.client("codebuild")
     codebuild_zipfile = f'{bucket_name}/{zip_file_key}'
 
-    base_image = 'public.ecr.aws/lambda/python:3.9'
+    # remove patch version from python version
+    runtime_version = python_version()
+    runtime_version = runtime_version.split('.')[:2]
+    runtime_version = '.'.join(runtime_version)
+    print(f'runtime version: {runtime_version}')
+
+    base_image = f'public.ecr.aws/lambda/python:{runtime_version}'
 
     args = {
         "name": cb_project_name,
@@ -243,6 +250,7 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
                 {"name": "IMAGE_REPO_NAME", "value": repo_name},
                 {"name": "IMAGE_TAG", "value": "latest"},
                 {"name": "BASE_IMAGE", "value": base_image},
+                {"name": "RUNTIME_VERSION", "value": runtime_version}
             ],
             "privilegedMode": True,
         },
