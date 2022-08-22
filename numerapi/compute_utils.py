@@ -618,6 +618,7 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
                 FunctionName=function_name,
                 ImageUri=image_uri
             )
+            retries = max_retries
             print('Function updated')
         except client.exceptions.InvalidParameterValueException as ex:
             print('Lambda IAM role not created yet, retrying in 5 seconds..')
