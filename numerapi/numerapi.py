@@ -556,7 +556,8 @@ class NumerAPI(base_api.Api):
     def upload_predictions(self, file_path: str = "predictions.csv",
                            tournament: int = 8,
                            model_id: str = None,
-                           df: pd.DataFrame = None) -> str:
+                           df: pd.DataFrame = None,
+                           source: str = "numerapi") -> str:
         """Upload predictions from file.
         Will read TRIGGER_ID from the environment if this model is enabled with
         a Numerai Compute cluster setup by Numerai CLI.
@@ -602,12 +603,13 @@ class NumerAPI(base_api.Api):
             mutation($filename: String!
                      $tournament: Int!
                      $modelId: String
-                     $triggerId: String) {
+                     $triggerId: String
+                     $source: String) {
                 create_submission(filename: $filename
                                   tournament: $tournament
                                   modelId: $modelId
                                   triggerId: $triggerId
-                                  source: "numerapi") {
+                                  source: $source) {
                     id
                 }
             }
@@ -615,7 +617,8 @@ class NumerAPI(base_api.Api):
         arguments = {'filename': upload_auth['filename'],
                      'tournament': tournament,
                      'modelId': model_id,
-                     'triggerId': os.getenv('TRIGGER_ID', None)}
+                     'triggerId': os.getenv('TRIGGER_ID', None),
+                     'source': source}
         create = self.raw_query(create_query, arguments, authorization=True)
         submission_id = create['data']['create_submission']['id']
         return submission_id
@@ -1112,14 +1115,17 @@ class NumerAPI(base_api.Api):
         # generate requirements.txt file..
         # TODO: better way to add numerapi to requirements..
         with open('requirements.txt', 'w') as file:
-            subprocess.Popen(['pipreqs', '--print'], stdout=file).communicate()
+            subprocess.Popen(['pip', 'list', '--format=freeze'], stdout=file).communicate()
 
         with open('requirements.txt', 'r') as file:
-            lines = file.readlines()
+            all_packages = file.readlines()
 
-        lines = [l for l in lines if "numerapi" not in l]
+        # remove numerapi from package list because we dont want to put the
+        # beta build into requirements.txt. once this build is deployed
+        # to pypi we wont need to add numerapi manually
+        all_packages = [l for l in all_packages if "numerapi" not in l]
         with open('requirements.txt', 'w') as file:
-            file.writelines(lines)
+            file.writelines(all_packages)
             file.write("numerapi\n")
             file.write("boto3\n")
             file.write("pyarrow\n")

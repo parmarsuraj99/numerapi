@@ -217,6 +217,10 @@ def maybe_create_codebuild_project(aws_account_id, bucket_name, zip_file_key, re
     '''
     maybe_create_policy_and_attach_role(policy_name, policy_document, aws_account_id, codebuild_role)
 
+    # sleep for 10 seconds after creating policy cause boto is a liar and
+    # complains about policy not being available when it is
+    time.sleep(10)
+
     session = boto3.session.Session()
     region = session.region_name
     client = session.client("codebuild")
@@ -378,6 +382,8 @@ def wait_for_build(id, poll_seconds=10):
         time.sleep(poll_seconds)
         status = client.batch_get_builds(ids=[id])
     print()
+    if status['builds'][0]['buildStatus'] == 'FAILED':
+        raise Exception('Codebuild build failed. Please see codebuild logs in AWS console for more information')
     print(f"Build complete, status = {status['builds'][0]['buildStatus']}")
     print(f"Logs at {status['builds'][0]['logs']['deepLink']}")
 
@@ -595,6 +601,10 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
     lambda_policy_name = 'numerai-compute-lambda-execution-policy'
     maybe_create_policy_and_attach_role(lambda_policy_name, lambda_policy_doc, aws_account_id, lambda_role)
 
+    # sleep for 10 seconds after creating policy cause boto is a liar and
+    # complains about policy not being available when it is
+    time.sleep(10)
+
     client = boto3.client('lambda')
 
     repo_uri = ecr['repositoryUri']
@@ -604,6 +614,21 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
     max_retries = 3
     while retries < max_retries:
         try:
+            client.update_function_code(
+                FunctionName=function_name,
+                ImageUri=image_uri
+            )
+            print('Function updated')
+        except client.exceptions.InvalidParameterValueException as ex:
+            print('Lambda IAM role not created yet, retrying in 5 seconds..')
+            retries = retries + 1
+            time.sleep(5)
+        except client.exceptions.ResourceConflictException as ex:
+            retries = max_retries
+            print(ex)
+        except client.exceptions.ResourceNotFoundException as ex:
+            retries = max_retries
+            print('Creating Lambda function')
             client.create_function(
                 FunctionName=function_name,
                 PackageType='Image',
@@ -614,18 +639,7 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
                 MemorySize=512,
                 Timeout=300
             )
-        except client.exceptions.InvalidParameterValueException as ex:
-            print('Lambda IAM role not created yet, retrying in 5 seconds..')
-            retries = retries + 1
-            time.sleep(5)
-        except client.exceptions.ResourceConflictException as ex:
-            retries = max_retries
-            print('Lambda already exists, updating to latest ECR image..')
-            client.update_function_code(
-                FunctionName=function_name,
-                ImageUri=image_uri
-            )
-            print('Function updated')
+            print('Lambda created')
         except Exception as ex:
             raise ex
 

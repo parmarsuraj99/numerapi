@@ -78,6 +78,13 @@ def run(event, context):
     return True
 
 
+def run_diagnostics(model_id, napi):
+    # download validation data
+    # predict on validation data
+    # diagnostics_id = napi.upload_diagnostics(file_path, tournament=8, model_id=model_id)
+    pass
+
+
 def set_lambda_status(function_name, model_id, request_id, status, napi, log_stream_name=None):
     query = f'''
         mutation setModelLambdaStatus($function_name: String!, $model_id: String!, $request_id: String!, $status: String!, $log_stream_name: String) {{
