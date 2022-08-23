@@ -32,7 +32,7 @@ def upload_to_s3(bucket_name, model_id, file_path):
     s3.upload_file(file_path, bucket_name, f'{model_id}/{file_path}')
 
 
-def maybe_create_zip_file(model_id, bucket_name):
+def maybe_create_zip_file(model_id, bucket_name, requirements_path):
     # ideally we would only do this step if the requirements.txt changes. but until then
     # this will just run every time
     orig_dir = os.getcwd()
@@ -70,7 +70,7 @@ def maybe_create_zip_file(model_id, bucket_name):
 
                 for dirname, _, filelist in os.walk(orig_dir):
                     for file in filelist:
-                        if file == 'requirements.txt':
+                        if file == requirements_path:
                             print('found requirements.txt')
                             zip.write(f"{dirname}/{file}", file)
 
@@ -382,6 +382,7 @@ def wait_for_build(id, poll_seconds=10):
     client = session.client("codebuild")
     status = client.batch_get_builds(ids=[id])
     first = True
+    print('starting docker build')
     while status["builds"][0]["buildStatus"] == "IN_PROGRESS":
         if not first:
             print(".", end="")
@@ -391,7 +392,9 @@ def wait_for_build(id, poll_seconds=10):
         status = client.batch_get_builds(ids=[id])
     print()
     if status['builds'][0]['buildStatus'] == 'FAILED':
-        raise Exception('Codebuild build failed. Please see codebuild logs in AWS console for more information')
+        print('Docker build failed, printing logs..')
+        logs_for_build(id, wait=False, session=session)
+        raise Exception('Codebuild build failed. See docker logs above for more information')
     print(f"Build complete, status = {status['builds'][0]['buildStatus']}")
     print(f"Logs at {status['builds'][0]['logs']['deepLink']}")
 
@@ -424,7 +427,7 @@ def log_stream(client, log_group, stream_name, position):
             logGroupName=log_group,
             logStreamName=stream_name,
             startTime=start_time,
-            startFromHead=True,
+            startFromHead=False,
             **token_arg,
         )
         next_token = response["nextForwardToken"]

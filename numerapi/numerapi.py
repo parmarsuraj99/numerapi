@@ -1087,7 +1087,7 @@ class NumerAPI(base_api.Api):
         self.show_progress_bars = prev_progress_bar_state
         return features_json_path
 
-    def deploy(self, model_id, model, features):
+    def deploy(self, model_id, model, features, requirements_path):
 
         numerapi_version = pkg_resources.get_distribution('numerapi').version
 
@@ -1112,26 +1112,32 @@ class NumerAPI(base_api.Api):
         compute_utils.upload_to_s3(bucket_name, model_id, 'model.pkl')
         compute_utils.upload_to_s3(bucket_name, model_id, 'features.json')
 
-        # generate requirements.txt file..
-        # TODO: better way to add numerapi to requirements..
-        with open('requirements.txt', 'w') as file:
-            subprocess.Popen(['pip', 'list', '--format=freeze'], stdout=file).communicate()
-
-        with open('requirements.txt', 'r') as file:
+        # during the beta, we need to make sure that we dont put the beta version
+        # of numerapi in the given requirements.txt, otherwise the docker build
+        # will fail. so I'm modifying the contents of the file here
+        # I'm also adding pyarrow because it's needed in the lambda_handler
+        # to open the live data file
+        with open(requirements_path, 'r') as file:
             all_packages = file.readlines()
 
-        # remove numerapi from package list because we dont want to put the
-        # beta build into requirements.txt. once this build is deployed
-        # to pypi we wont need to add numerapi manually
+        add_pyarrow = True
+        add_boto3 = True
+        for package in all_packages:
+            if 'pyarrow' in package:
+                add_pyarrow = False
+            if 'boto3' in package:
+                add_boto3 = False
         all_packages = [l for l in all_packages if "numerapi" not in l]
-        with open('requirements.txt', 'w') as file:
+        with open(requirements_path, 'w') as file:
             file.writelines(all_packages)
             file.write("numerapi\n")
-            file.write("boto3\n")
-            file.write("pyarrow\n")
+            if add_pyarrow:
+                file.write("pyarrow\n")
+            if add_boto3:
+                file.write("boto3\n")
 
         # TODO: only run these steps if requirements.txt file changes
-        zip_file_key = compute_utils.maybe_create_zip_file(model_id, bucket_name)
+        zip_file_key = compute_utils.maybe_create_zip_file(model_id, bucket_name, requirements_path)
         # TODO: need ability to not use default repo? feature not needed til later tho
         ecr = compute_utils.maybe_create_ecr_repo()
 
