@@ -630,6 +630,18 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
                 ImageUri=image_uri
             )
             retries = max_retries
+
+            # set the event invoke config to not retry on error (default is retry twice)
+            try:
+                client.update_function_event_invoke_config(
+                    FunctionName=function_name,
+                    MaximumRetryAttempts=0
+                )
+            except client.exceptions.ResourceNotFoundException as ex:
+                client.put_function_event_invoke_config(
+                    FunctionName=function_name,
+                    MaximumRetryAttempts=0
+                )
             print('Function updated')
         except client.exceptions.InvalidParameterValueException as ex:
             print('Lambda IAM role not created yet, retrying in 5 seconds..')
@@ -648,10 +660,16 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
                     'ImageUri': image_uri
                 },
                 Role=lambda_role['Arn'],
-                MemorySize=512,
-                Timeout=300
+                MemorySize=2000,
+                Timeout=120
             )
             print('Lambda created')
+
+            # set the event invoke config to not retry on error (default is retry twice)
+            client.put_function_event_invoke_config(
+                FunctionName=function_name,
+                MaximumRetryAttempts=0
+            )
         except Exception as ex:
             raise ex
 

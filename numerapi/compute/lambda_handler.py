@@ -15,8 +15,6 @@ secret = json.loads(api_keys_secret['SecretString'])
 
 
 def run(event, context):
-    print(event)
-    print(context)
 
     napi = NumerAPI(
         public_id=secret['public_id'],
@@ -24,6 +22,13 @@ def run(event, context):
     )
 
     model_id = event['model_id']
+    if 'data_version' in event:
+        data_version = event['data_version']
+    else:
+        data_version = 'v4'
+
+    print(f'Running submission for model_id: {model_id}')
+    print(f'Data version: {data_version}')
 
     request_id = context.aws_request_id
     log_stream_name = context.log_stream_name
@@ -32,9 +37,16 @@ def run(event, context):
     try:
 
         current_round = napi.get_current_round()
-        napi.download_dataset("v4/live.parquet", f"/tmp/v4/live_{current_round}.parquet")
-        live_data = pd.read_parquet(f'/tmp/v4/live_{current_round}.parquet')
-        logger.info(f'Downloaded /tmp/v4/live_{current_round}.parquet')
+
+        if data_version in ['v2', 'v3']:
+            live_data_filename = 'numerai_live_data.parquet'
+        else:
+            live_data_filename = f'live.parquet'
+
+        live_data_local_path = f"/tmp/{data_version}/{live_data_filename}"
+        napi.download_dataset(f"{data_version}/{live_data_filename}", live_data_local_path)
+        live_data = pd.read_parquet(live_data_local_path)
+        logger.info(f'Downloaded {live_data_local_path}')
 
         s3 = boto3.client('s3')
         aws_account_id = boto3.client('sts').get_caller_identity().get('Account')

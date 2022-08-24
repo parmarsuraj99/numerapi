@@ -1087,7 +1087,7 @@ class NumerAPI(base_api.Api):
         self.show_progress_bars = prev_progress_bar_state
         return features_json_path
 
-    def deploy(self, model_id, model, features, requirements_path):
+    def deploy(self, model_id, model, features, requirements_path, data_version='v4'):
 
         numerapi_version = pkg_resources.get_distribution('numerapi').version
 
@@ -1167,17 +1167,18 @@ class NumerAPI(base_api.Api):
         resp = self.raw_query(query, authorization=True)
         model_name = resp['data']['model']['name']
         lambda_role_arn, lambda_function_name = compute_utils.maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, model_id, external_id)
-        self.set_lambda_data(model_id, lambda_role_arn, lambda_function_name, numerapi_version)
+        self.set_lambda_data(model_id, lambda_role_arn, lambda_function_name, numerapi_version, data_version)
 
         print(f'Deploy complete! Go to https://numer.ai/compute to view your deployed model')
 
-    def set_lambda_data(self, model_id, lambda_role_arn, lambda_function_name, numerapi_version):
+    def set_lambda_data(self, model_id, lambda_role_arn, lambda_function_name, numerapi_version, data_version):
         query = f'''mutation setModelLambdaArn {{
             modelLambdaArn(
                 modelId:"{model_id}", 
                 roleArn:"{lambda_role_arn}",
                 functionName:"{lambda_function_name}",
-                numerapiVersion:"{numerapi_version}") {{
+                numerapiVersion:"{numerapi_version}",
+                dataVersion:"{data_version}") {{
             lambdaRoleArn
             userId
             lambdaFunctionName
