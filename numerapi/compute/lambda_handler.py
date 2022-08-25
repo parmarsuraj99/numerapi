@@ -69,7 +69,7 @@ def run(event, context):
         predict_output_path = f"/tmp/live_predictions_{current_round}.csv"
         if data_version == 'v2':
             # v2 live data id column is not the index so needs to be specified in output here
-            live_data[["id", "prediction"]].to_csv(predict_output_path)
+            live_data[["id", "prediction"]].to_csv(predict_output_path, index=False)
         else:
             live_data["prediction"].to_csv(predict_output_path)
 
