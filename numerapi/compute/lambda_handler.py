@@ -67,7 +67,11 @@ def run(event, context):
         logger.info(f'Live predictions and ranked')
 
         predict_output_path = f"/tmp/live_predictions_{current_round}.csv"
-        live_data["prediction"].to_csv(predict_output_path)
+        if data_version == 'v2':
+            # v2 live data id column is not the index so needs to be specified in output here
+            live_data[["id", "prediction"]].to_csv(predict_output_path)
+        else:
+            live_data["prediction"].to_csv(predict_output_path)
 
         print(f'submitting {predict_output_path}')
         napi.upload_predictions(predict_output_path, model_id=model_id)
