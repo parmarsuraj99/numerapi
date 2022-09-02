@@ -627,8 +627,24 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
         try:
             client.update_function_code(
                 FunctionName=function_name,
-                ImageUri=image_uri
+                ImageUri=image_uri,
             )
+            print('Updated function code')
+
+            waiter = client.get_waiter('function_updated_v2')
+            waiter.wait(
+                FunctionName=function_name,
+            )
+
+            client.update_function_configuration(
+                FunctionName=function_name,
+                EphemeralStorage={
+                    'Size': 2000
+                },
+                MemorySize=3008,
+                Timeout=300
+            )
+            print(f'Updated function configuration')
             retries = max_retries
 
             # set the event invoke config to not retry on error (default is retry twice)
@@ -642,7 +658,7 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
                     FunctionName=function_name,
                     MaximumRetryAttempts=0
                 )
-            print('Function updated')
+            print('Lambda update complete')
         except client.exceptions.InvalidParameterValueException as ex:
             print('Lambda IAM role not created yet, retrying in 5 seconds..')
             retries = retries + 1
@@ -660,8 +676,11 @@ def maybe_create_lambda_function(model_name, ecr, bucket_name, aws_account_id, m
                     'ImageUri': image_uri
                 },
                 Role=lambda_role['Arn'],
-                MemorySize=2000,
-                Timeout=120
+                MemorySize=3008,
+                Timeout=300,
+                EphemeralStorage={
+                    'Size': 2000
+                }
             )
             print('Lambda created')
 
