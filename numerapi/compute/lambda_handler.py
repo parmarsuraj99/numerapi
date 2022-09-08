@@ -10,6 +10,8 @@ import sys
 import traceback
 from pyarrow.parquet import ParquetFile
 import pyarrow.parquet as pq
+from numerapi.compute.custom_model import ModelWrapper
+
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -71,12 +73,12 @@ def run_submission(napi, model_id, data_version):
     logger.info(f'Downloaded live data')
 
     model_name = 'model'
-    model, features = get_model_and_features(model_id)
+    model_wrapper, features = get_model_wrapper_and_features(model_id)
 
-    live_data.loc[:, f"preds_{model_name}"] = model.predict(
+    live_data.loc[:, f"preds_{model_name}"] = model_wrapper.predict(
         live_data.loc[:, features])
 
-    live_data["prediction"] = live_data[f"preds_{model_name}"].rank(pct=True)
+    live_data["prediction"] = model_wrapper.post_predict(live_data[f"preds_{model_name}"])
     logger.info(f'Live predictions and ranked')
 
     predict_output_path = f"/tmp/live_predictions_{current_round}.csv"
@@ -167,18 +169,24 @@ def get_data(napi, data_version, data_type):
     return pd.read_parquet(data_local_path)
 
 
-def get_model_and_features(model_id):
+def get_model_wrapper_and_features(model_id):
     s3 = boto3.client('s3')
     aws_account_id = boto3.client('sts').get_caller_identity().get('Account')
+    try:
+        from custom_model import CustomModel
+        model_wrapper = CustomModel(None, model_id)
+    except Exception as ex:
+        print('No custom model wrapper found, using default')
+        model_wrapper = ModelWrapper(None, model_id)
+
     s3.download_file(f'numerai-compute-{aws_account_id}', f'{model_id}/model.pkl', '/tmp/model.pkl')
-    model = pd.read_pickle(f"/tmp/model.pkl")
-    logger.info(f'Unpickled {model_id}/model.pkl')
+    model_wrapper.unpickle('/tmp/model.pkl')
 
     s3.download_file(f'numerai-compute-{aws_account_id}', f'{model_id}/features.json', '/tmp/features.json')
     f = open('/tmp/features.json')
     features = json.load(f)
     logger.info(f'Loaded features {model_id}/features.json')
-    return model, features
+    return model_wrapper, features
 
 
 def read_parquet_via_pandas_generator(filename, batch_size=128, reads_per_file=5):
