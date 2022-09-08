@@ -10,7 +10,7 @@ import sys
 import traceback
 from pyarrow.parquet import ParquetFile
 import pyarrow.parquet as pq
-from numerapi.compute.custom_model import ModelWrapper
+from numerapi.compute.model_wrapper import ModelWrapper
 
 
 logger = logging.getLogger()
