@@ -17,7 +17,6 @@ import pandas as pd
 from numerapi import utils, compute_utils
 from numerapi import base_api
 import pkg_resources
-from numerapi.compute.custom_model import ModelWrapper
 
 
 class NumerAPI(base_api.Api):
@@ -1132,7 +1131,7 @@ class NumerAPI(base_api.Api):
         all_packages = [l for l in all_packages if "numerapi" not in l]
         with open(requirements_path, 'w') as file:
             file.writelines(all_packages)
-            # file.write("numerapi\n")
+            file.write("git+https://github.com/numerai/numerapi@chris/compute-lite-beta-test\n")
             if add_pyarrow:
                 file.write("pyarrow\n")
             if add_boto3:

@@ -108,7 +108,7 @@ def run_diagnostics(napi, model_id, data_version):
 
     # predict on validation data
     model_name = 'model'
-    model, features = get_model_and_features(model_id)
+    model, features = get_model_wrapper_and_features(model_id)
 
     predictions = []
     gc.collect()
