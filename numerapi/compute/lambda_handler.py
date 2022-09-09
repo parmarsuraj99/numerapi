@@ -173,10 +173,10 @@ def get_model_wrapper_and_features(model_id):
     aws_account_id = boto3.client('sts').get_caller_identity().get('Account')
     try:
         from custom_model import CustomModel
-        model_wrapper = CustomModel(None, model_id)
+        model_wrapper = CustomModel(model_id)
     except Exception as ex:
         print('No custom model wrapper found, using default')
-        model_wrapper = ModelWrapper(None, model_id)
+        model_wrapper = ModelWrapper(model_id)
 
     pickle_prefix = '/tmp'
     s3.download_file(
