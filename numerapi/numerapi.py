@@ -1104,13 +1104,12 @@ class NumerAPI(base_api.Api):
         aws_account_id = boto3.client('sts').get_caller_identity().get('Account')
         bucket_name = compute_utils.maybe_create_bucket(aws_account_id)
 
-        pickle_local_path = "model.pkl"
-        model_wrapper.pickle(pickle_local_path)
+        model_wrapper.pickle(model)
         with open('features.json', 'w') as f:
             json.dump(features, f)
 
         # upload model and features to s3
-        compute_utils.upload_to_s3(bucket_name, model_id, pickle_local_path)
+        compute_utils.upload_to_s3(bucket_name, model_id, model_wrapper.pickled_model_path)
         compute_utils.upload_to_s3(bucket_name, model_id, 'features.json')
 
         # during the beta, we need to make sure that we dont put the beta version

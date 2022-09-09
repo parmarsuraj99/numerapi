@@ -6,22 +6,20 @@ import pandas as pd
 # TODO: type hints
 class ModelWrapper:
 
-    def __init__(self, model, model_id: str):
-        self.model = model
+    pickled_model_path = 'model.pkl'
+
+    def __init__(self, model_id: str):
         self.model_id = model_id
 
-    def pickle(self, pickle_local_path):
-        pd.to_pickle(self.model, pickle_local_path)
+    def pickle(self, model):
+        pd.to_pickle(model, self.pickled_model_path)
 
-    def unpickle(self, pickle_local_path: str):
-        self.model = pd.read_pickle(pickle_local_path)
+    def unpickle(self, pickle_prefix: str):
+        return pd.read_pickle(f'{pickle_prefix}/{self.pickled_model_path}')
 
     def pre_predict(self, data):
         pass
 
-    def predict(self, data):
-        return self.model.predict(data)
-
-    def post_predict(self, predictions):
+    def post_predict(self, predictions, round_number):
         return predictions.rank(pct=True)
 

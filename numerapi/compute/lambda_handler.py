@@ -73,12 +73,11 @@ def run_submission(napi, model_id, data_version):
     logger.info(f'Downloaded live data')
 
     model_name = 'model'
-    model_wrapper, features = get_model_wrapper_and_features(model_id)
+    model, model_wrapper, features = get_model_wrapper_and_features(model_id)
 
-    live_data.loc[:, f"preds_{model_name}"] = model_wrapper.predict(
-        live_data.loc[:, features])
+    live_data.loc[:, f"preds_{model_name}"] = model.predict(live_data.loc[:, features])
 
-    live_data["prediction"] = model_wrapper.post_predict(live_data[f"preds_{model_name}"])
+    live_data["prediction"] = model_wrapper.post_predict(live_data[f"preds_{model_name}"], round_number=current_round)
     logger.info(f'Live predictions and ranked')
 
     predict_output_path = f"/tmp/live_predictions_{current_round}.csv"
@@ -108,7 +107,7 @@ def run_diagnostics(napi, model_id, data_version):
 
     # predict on validation data
     model_name = 'model'
-    model, features = get_model_wrapper_and_features(model_id)
+    model, model_wrapper, features = get_model_wrapper_and_features(model_id)
 
     predictions = []
     gc.collect()
@@ -179,14 +178,18 @@ def get_model_wrapper_and_features(model_id):
         print('No custom model wrapper found, using default')
         model_wrapper = ModelWrapper(None, model_id)
 
-    s3.download_file(f'numerai-compute-{aws_account_id}', f'{model_id}/model.pkl', '/tmp/model.pkl')
-    model_wrapper.unpickle('/tmp/model.pkl')
+    pickle_prefix = '/tmp'
+    s3.download_file(
+        f'numerai-compute-{aws_account_id}',
+        f'{model_id}/{model_wrapper.pickled_model_path}',
+        f'{pickle_prefix}/{model_wrapper.pickled_model_path}')
+    model = model_wrapper.unpickle(pickle_prefix)
 
     s3.download_file(f'numerai-compute-{aws_account_id}', f'{model_id}/features.json', '/tmp/features.json')
     f = open('/tmp/features.json')
     features = json.load(f)
     logger.info(f'Loaded features {model_id}/features.json')
-    return model_wrapper, features
+    return model, model_wrapper, features
 
 
 def read_parquet_via_pandas_generator(filename, batch_size=128, reads_per_file=5):
