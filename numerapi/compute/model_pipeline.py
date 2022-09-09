@@ -4,7 +4,7 @@ import pandas as pd
 # This is the default model wrapper that can be extended for
 # adding custom code to your submission pipeline
 # TODO: type hints
-class ModelWrapper:
+class DefaultPipeline:
 
     pickled_model_path = 'model.pkl'
 

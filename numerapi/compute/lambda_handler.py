@@ -10,7 +10,7 @@ import sys
 import traceback
 from pyarrow.parquet import ParquetFile
 import pyarrow.parquet as pq
-from numerapi.compute.model_wrapper import ModelWrapper
+from numerapi.compute.model_pipeline import DefaultPipeline
 
 
 logger = logging.getLogger()
@@ -116,7 +116,7 @@ def run_diagnostics(napi, model_id, data_version):
     for batch in parquet_file.iter_batches(batch_size=32000, columns=features, use_pandas_metadata=True):
         batch_df = batch.to_pandas()
         batch_df.loc[:, f"preds_{model_name}"] = model.predict(batch_df.loc[:, features])
-        batch_df["prediction"] = batch_df[f"preds_{model_name}"].rank(pct=True)
+        batch_df["prediction"] = model_wrapper.post_predict(batch_df[f"preds_{model_name}"])
         predictions.append(batch_df["prediction"])
 
     preds = pd.concat(predictions)
@@ -176,7 +176,7 @@ def get_model_wrapper_and_features(model_id):
         model_wrapper = CustomModel(model_id)
     except Exception as ex:
         print('No custom model wrapper found, using default')
-        model_wrapper = ModelWrapper(model_id)
+        model_wrapper = DefaultPipeline(model_id)
 
     pickle_prefix = '/tmp'
     s3.download_file(
