@@ -16,6 +16,7 @@ import pandas as pd
 
 from numerapi import utils, compute_utils
 from numerapi import base_api
+from numerapi.compute.model_pipeline import DefaultPipeline
 import pkg_resources
 
 
@@ -1087,7 +1088,7 @@ class NumerAPI(base_api.Api):
         self.show_progress_bars = prev_progress_bar_state
         return features_json_path
 
-    def deploy(self, model_id, model, features, requirements_path, data_version='v4', custom_pipeline=None, custom_pipeline_path=None):
+    def deploy(self, model_id, model, features, requirements_path, data_version='v4', model_pipeline=None, custom_pipeline_path=None):
 
         numerapi_version = pkg_resources.get_distribution('numerapi').version
 
@@ -1104,12 +1105,15 @@ class NumerAPI(base_api.Api):
         aws_account_id = boto3.client('sts').get_caller_identity().get('Account')
         bucket_name = compute_utils.maybe_create_bucket(aws_account_id)
 
-        custom_pipeline.pickle(model)
+        if model_pipeline is None:
+            model_pipeline = DefaultPipeline(model_id)
+
+        model_pipeline.pickle(model)
         with open('features.json', 'w') as f:
             json.dump(features, f)
 
         # upload model and features to s3
-        compute_utils.upload_to_s3(bucket_name, model_id, custom_pipeline.pickled_model_path)
+        compute_utils.upload_to_s3(bucket_name, model_id, model_pipeline.pickled_model_path)
         compute_utils.upload_to_s3(bucket_name, model_id, 'features.json')
 
         # during the beta, we need to make sure that we dont put the beta version
