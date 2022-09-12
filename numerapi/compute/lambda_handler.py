@@ -172,8 +172,8 @@ def get_model_wrapper_and_features(model_id):
     s3 = boto3.client('s3')
     aws_account_id = boto3.client('sts').get_caller_identity().get('Account')
     try:
-        from custom_model import CustomModel
-        model_wrapper = CustomModel(model_id)
+        from custom_pipeline import CustomPipeline
+        model_wrapper = CustomPipeline(model_id)
     except Exception as ex:
         print('No custom model wrapper found, using default')
         model_wrapper = DefaultPipeline(model_id)
