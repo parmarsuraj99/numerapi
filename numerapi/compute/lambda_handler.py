@@ -116,7 +116,7 @@ def run_diagnostics(napi, model_id, data_version):
     for batch in parquet_file.iter_batches(batch_size=32000, columns=features, use_pandas_metadata=True):
         batch_df = batch.to_pandas()
         batch_df.loc[:, f"preds_{model_name}"] = model.predict(batch_df.loc[:, features])
-        batch_df["prediction"] = model_wrapper.post_predict(batch_df[f"preds_{model_name}"])
+        batch_df["prediction"] = model_wrapper.post_predict(batch_df[f"preds_{model_name}"], round_number=None)
         predictions.append(batch_df["prediction"])
 
     preds = pd.concat(predictions)
