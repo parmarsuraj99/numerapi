@@ -12,6 +12,9 @@ class DefaultPipeline:
 
     def pickle(self, model):
         pd.to_pickle(model, self.pickled_model_path)
+       
+    def predict(self, X):
+        pass
 
     def unpickle(self, pickle_prefix: str):
         return pd.read_pickle(f'{pickle_prefix}/{self.pickled_model_path}')
